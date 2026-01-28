@@ -454,24 +454,42 @@
         // Symbolen die makkelijk te onderscheiden zijn voor kinderen
         const SYMBOLS = ['●', '■', '▲', '★', '♦', '♥', '○', '□'];
 
-        // Basis kleuren palet met Nederlandse namen
+        // Uitgebreid kleuren palet met Nederlandse namen (echte strijkkralen kleuren)
         const COLOR_PALETTE = [
+            // Basis kleuren
             { hex: '#FF0000', name: 'Rood' },
+            { hex: '#CC0000', name: 'Donkerrood' },
             { hex: '#0000FF', name: 'Blauw' },
+            { hex: '#000080', name: 'Donkerblauw' },
+            { hex: '#87CEEB', name: 'Lichtblauw' },
+            { hex: '#00BFFF', name: 'Helderblauw' },
+            { hex: '#40E0D0', name: 'Turquoise' },
+            { hex: '#00FFFF', name: 'Aqua' },
             { hex: '#FFFF00', name: 'Geel' },
-            { hex: '#00FF00', name: 'Groen' },
-            { hex: '#FF8000', name: 'Oranje' },
-            { hex: '#FF00FF', name: 'Roze' },
-            { hex: '#800080', name: 'Paars' },
-            { hex: '#00FFFF', name: 'Lichtblauw' },
-            { hex: '#8B4513', name: 'Bruin' },
+            { hex: '#FFD700', name: 'Goud' },
+            { hex: '#FFA500', name: 'Oranje' },
+            { hex: '#FF8C00', name: 'Donkeroranje' },
+            { hex: '#00FF00', name: 'Felgroen' },
+            { hex: '#32CD32', name: 'Groen' },
+            { hex: '#006400', name: 'Donkergroen' },
+            { hex: '#90EE90', name: 'Lichtgroen' },
+            { hex: '#FF69B4', name: 'Roze' },
             { hex: '#FFC0CB', name: 'Lichtroze' },
+            { hex: '#FF1493', name: 'Felroze' },
+            { hex: '#800080', name: 'Paars' },
+            { hex: '#9370DB', name: 'Lichtpaars' },
+            { hex: '#4B0082', name: 'Donkerpaars' },
+            { hex: '#8B4513', name: 'Bruin' },
+            { hex: '#D2691E', name: 'Lichtbruin' },
+            { hex: '#F5DEB3', name: 'Beige' },
+            { hex: '#FFDAB9', name: 'Perzik' },
+            { hex: '#FFE4B5', name: 'Crème' },
+            // Neutralen
             { hex: '#000000', name: 'Zwart' },
             { hex: '#FFFFFF', name: 'Wit' },
             { hex: '#808080', name: 'Grijs' },
-            { hex: '#90EE90', name: 'Lichtgroen' },
-            { hex: '#FFD700', name: 'Goud' },
-            { hex: '#C0C0C0', name: 'Zilver' }
+            { hex: '#C0C0C0', name: 'Lichtgrijs' },
+            { hex: '#404040', name: 'Donkergrijs' }
         ];
 
         const GRID_SIZE = 30;
@@ -574,11 +592,19 @@
         }
 
         function colorDistance(c1, c2) {
-            // Gewogen Euclidische afstand (menselijk oog is gevoeliger voor groen)
+            // Verbeterde kleurafstand berekening (redmean approximation)
+            // Beter voor visuele kleurgelijkheid dan standaard Euclidische afstand
+            const rMean = (c1.r + c2.r) / 2;
             const rDiff = c1.r - c2.r;
             const gDiff = c1.g - c2.g;
             const bDiff = c1.b - c2.b;
-            return Math.sqrt(rDiff * rDiff * 0.3 + gDiff * gDiff * 0.59 + bDiff * bDiff * 0.11);
+
+            // Gewichten gebaseerd op gemiddelde roodwaarde
+            const rWeight = 2 + rMean / 256;
+            const gWeight = 4;
+            const bWeight = 2 + (255 - rMean) / 256;
+
+            return Math.sqrt(rWeight * rDiff * rDiff + gWeight * gDiff * gDiff + bWeight * bDiff * bDiff);
         }
 
         function hexToRgb(hex) {
@@ -598,113 +624,48 @@
         }
 
         function reduceColors(pixels, maxColors) {
-            // Verzamel alle unieke kleuren en tel ze
-            const colorCounts = new Map();
-
-            for (let y = 0; y < GRID_SIZE; y++) {
-                for (let x = 0; x < GRID_SIZE; x++) {
-                    const pixel = pixels[y][x];
-                    const key = `${pixel.r},${pixel.g},${pixel.b}`;
-                    colorCounts.set(key, (colorCounts.get(key) || 0) + 1);
-                }
-            }
-
-            // Converteer naar array en sorteer op frequentie
-            const uniqueColors = Array.from(colorCounts.entries())
-                .map(([key, count]) => {
-                    const [r, g, b] = key.split(',').map(Number);
-                    return { r, g, b, count };
-                })
-                .sort((a, b) => b.count - a.count);
-
-            // Gebruik median cut algoritme voor kleurreductie
-            let colorBuckets = [uniqueColors];
-
-            while (colorBuckets.length < maxColors && colorBuckets.some(b => b.length > 1)) {
-                // Vind de bucket met de grootste spreiding
-                let maxSpread = -1;
-                let bucketToSplit = -1;
-                let splitChannel = 'r';
-
-                for (let i = 0; i < colorBuckets.length; i++) {
-                    if (colorBuckets[i].length <= 1) continue;
-
-                    const bucket = colorBuckets[i];
-                    for (const channel of ['r', 'g', 'b']) {
-                        const values = bucket.map(c => c[channel]);
-                        const spread = Math.max(...values) - Math.min(...values);
-                        if (spread > maxSpread) {
-                            maxSpread = spread;
-                            bucketToSplit = i;
-                            splitChannel = channel;
-                        }
-                    }
-                }
-
-                if (bucketToSplit === -1) break;
-
-                // Splits de bucket
-                const bucket = colorBuckets[bucketToSplit];
-                bucket.sort((a, b) => a[splitChannel] - b[splitChannel]);
-                const mid = Math.floor(bucket.length / 2);
-
-                colorBuckets.splice(bucketToSplit, 1,
-                    bucket.slice(0, mid),
-                    bucket.slice(mid)
-                );
-            }
-
-            // Bereken gemiddelde kleur per bucket en match met palet
-            const reducedColors = colorBuckets
-                .filter(bucket => bucket.length > 0)
-                .map(bucket => {
-                    const totalWeight = bucket.reduce((sum, c) => sum + c.count, 0);
-                    const avgR = bucket.reduce((sum, c) => sum + c.r * c.count, 0) / totalWeight;
-                    const avgG = bucket.reduce((sum, c) => sum + c.g * c.count, 0) / totalWeight;
-                    const avgB = bucket.reduce((sum, c) => sum + c.b * c.count, 0) / totalWeight;
-
-                    return { r: avgR, g: avgG, b: avgB };
-                });
-
-            // Match elke gereduceerde kleur met de dichtstbijzijnde palet kleur
+            // Converteer palet naar RGB
             const paletteRgb = COLOR_PALETTE.map(c => ({
                 ...hexToRgb(c.hex),
                 hex: c.hex,
                 name: c.name
             }));
 
-            const finalColors = reducedColors.map(color => {
-                let minDist = Infinity;
-                let bestMatch = paletteRgb[0];
+            // STAP 1: Match elke pixel direct met dichtstbijzijnde palet kleur
+            const paletteUsage = new Map();
+            const pixelPaletteMap = [];
 
-                for (const paletteColor of paletteRgb) {
-                    const dist = colorDistance(color, paletteColor);
-                    if (dist < minDist) {
-                        minDist = dist;
-                        bestMatch = paletteColor;
+            for (let y = 0; y < GRID_SIZE; y++) {
+                const row = [];
+                for (let x = 0; x < GRID_SIZE; x++) {
+                    const pixel = pixels[y][x];
+                    let minDist = Infinity;
+                    let bestPaletteIndex = 0;
+
+                    for (let i = 0; i < paletteRgb.length; i++) {
+                        const dist = colorDistance(pixel, paletteRgb[i]);
+                        if (dist < minDist) {
+                            minDist = dist;
+                            bestPaletteIndex = i;
+                        }
                     }
+
+                    row.push(bestPaletteIndex);
+                    const hex = paletteRgb[bestPaletteIndex].hex;
+                    paletteUsage.set(hex, (paletteUsage.get(hex) || 0) + 1);
                 }
-
-                return {
-                    original: color,
-                    matched: bestMatch
-                };
-            });
-
-            // Verwijder dubbele matches
-            const usedHexes = new Set();
-            const uniqueFinalColors = [];
-
-            for (const color of finalColors) {
-                if (!usedHexes.has(color.matched.hex)) {
-                    usedHexes.add(color.matched.hex);
-                    uniqueFinalColors.push(color);
-                }
+                pixelPaletteMap.push(row);
             }
 
-            // Map elke pixel naar de dichtstbijzijnde finale kleur
+            // STAP 2: Selecteer de top N meest gebruikte kleuren
+            const sortedColors = Array.from(paletteUsage.entries())
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, maxColors)
+                .map(([hex]) => paletteRgb.find(c => c.hex === hex));
+
+            // STAP 3: Hermap elke pixel naar alleen de geselecteerde kleuren
             const mappedPixels = [];
-            const colorUsage = new Map();
+            const finalColorUsage = new Map();
 
             for (let y = 0; y < GRID_SIZE; y++) {
                 const row = [];
@@ -713,8 +674,8 @@
                     let minDist = Infinity;
                     let bestIndex = 0;
 
-                    for (let i = 0; i < uniqueFinalColors.length; i++) {
-                        const dist = colorDistance(pixel, uniqueFinalColors[i].original);
+                    for (let i = 0; i < sortedColors.length; i++) {
+                        const dist = colorDistance(pixel, sortedColors[i]);
                         if (dist < minDist) {
                             minDist = dist;
                             bestIndex = i;
@@ -722,19 +683,18 @@
                     }
 
                     row.push(bestIndex);
-
-                    const hex = uniqueFinalColors[bestIndex].matched.hex;
-                    colorUsage.set(hex, (colorUsage.get(hex) || 0) + 1);
+                    const hex = sortedColors[bestIndex].hex;
+                    finalColorUsage.set(hex, (finalColorUsage.get(hex) || 0) + 1);
                 }
                 mappedPixels.push(row);
             }
 
-            // Voeg usage toe aan colors
-            const colorsWithUsage = uniqueFinalColors.map((c, i) => ({
-                ...c.matched,
+            // STAP 4: Bouw finale kleuren array met symbolen en counts
+            const colorsWithUsage = sortedColors.map((color, i) => ({
+                ...color,
                 symbol: SYMBOLS[i],
                 index: i,
-                count: colorUsage.get(c.matched.hex) || 0
+                count: finalColorUsage.get(color.hex) || 0
             }));
 
             return {
