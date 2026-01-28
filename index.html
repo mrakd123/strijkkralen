@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Strijkkralen Patroon Maker</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+
+        h1 {
+            text-align: center;
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: rgba(255,255,255,0.9);
+            margin-bottom: 30px;
+            font-size: 1.2em;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+
+        .upload-section {
+            text-align: center;
+            padding: 40px;
+            border: 3px dashed #667eea;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            background: #f8f9ff;
+            transition: all 0.3s ease;
+        }
+
+        .upload-section:hover {
+            border-color: #764ba2;
+            background: #f0f2ff;
+        }
+
+        .upload-section.dragover {
+            border-color: #764ba2;
+            background: #e8ebff;
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        .upload-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 40px;
+            border: none;
+            border-radius: 30px;
+            font-size: 1.2em;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .upload-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .upload-text {
+            color: #666;
+            margin-top: 15px;
+            font-size: 1em;
+        }
+
+        .settings {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f8f9ff;
+            border-radius: 15px;
+        }
+
+        .setting-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .setting-group label {
+            font-weight: bold;
+            color: #333;
+        }
+
+        .setting-group select,
+        .setting-group input {
+            padding: 10px 15px;
+            border: 2px solid #667eea;
+            border-radius: 10px;
+            font-size: 1em;
+            background: white;
+        }
+
+        .preview-section {
+            display: none;
+            margin-bottom: 30px;
+        }
+
+        .preview-section.visible {
+            display: block;
+        }
+
+        .preview-container {
+            display: flex;
+            gap: 30px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .preview-box {
+            text-align: center;
+        }
+
+        .preview-box h3 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        #originalPreview {
+            max-width: 200px;
+            max-height: 200px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        .pattern-section {
+            display: none;
+        }
+
+        .pattern-section.visible {
+            display: block;
+        }
+
+        .pattern-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .pattern-header h2 {
+            color: #333;
+            margin: 0;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+        .action-btn {
+            padding: 12px 25px;
+            border: none;
+            border-radius: 25px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .print-btn {
+            background: #28a745;
+            color: white;
+        }
+
+        .print-btn:hover {
+            background: #218838;
+        }
+
+        .reset-btn {
+            background: #dc3545;
+            color: white;
+        }
+
+        .reset-btn:hover {
+            background: #c82333;
+        }
+
+        .pattern-wrapper {
+            display: flex;
+            gap: 30px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .grid-container {
+            overflow-x: auto;
+        }
+
+        #patternGrid {
+            display: grid;
+            grid-template-columns: repeat(30, 1fr);
+            gap: 1px;
+            background: #333;
+            padding: 1px;
+            border-radius: 5px;
+            width: fit-content;
+        }
+
+        .grid-cell {
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: bold;
+            color: #333;
+            text-shadow: 0 0 2px white, 0 0 2px white, 0 0 2px white, 0 0 2px white;
+        }
+
+        .legend {
+            background: #f8f9ff;
+            padding: 20px;
+            border-radius: 15px;
+            min-width: 200px;
+        }
+
+        .legend h3 {
+            margin-top: 0;
+            color: #333;
+            text-align: center;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 10px;
+            margin-bottom: 8px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .legend-color {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: 3px solid #333;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 1.2em;
+        }
+
+        .legend-info {
+            flex: 1;
+        }
+
+        .legend-name {
+            font-weight: bold;
+            color: #333;
+        }
+
+        .legend-count {
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        .instructions {
+            margin-top: 30px;
+            padding: 20px;
+            background: #fff3cd;
+            border-radius: 15px;
+            border-left: 5px solid #ffc107;
+        }
+
+        .instructions h3 {
+            margin-top: 0;
+            color: #856404;
+        }
+
+        .instructions ul {
+            color: #856404;
+            margin: 0;
+            padding-left: 20px;
+        }
+
+        .instructions li {
+            margin-bottom: 8px;
+        }
+
+        /* Print styles */
+        @media print {
+            body {
+                background: white;
+                padding: 10px;
+            }
+
+            .container {
+                box-shadow: none;
+                padding: 10px;
+            }
+
+            .upload-section,
+            .settings,
+            .action-buttons,
+            h1,
+            .subtitle {
+                display: none !important;
+            }
+
+            .pattern-section {
+                display: block !important;
+            }
+
+            .pattern-wrapper {
+                flex-direction: column;
+            }
+
+            #patternGrid {
+                gap: 0;
+            }
+
+            .grid-cell {
+                width: 18px;
+                height: 18px;
+                font-size: 9px;
+                border: 0.5px solid #ccc;
+            }
+
+            .legend {
+                page-break-before: avoid;
+            }
+
+            .legend-item {
+                padding: 5px;
+                margin-bottom: 5px;
+            }
+
+            .instructions {
+                page-break-before: always;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .grid-cell {
+                width: 12px;
+                height: 12px;
+                font-size: 7px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>Strijkkralen Patroon Maker</h1>
+    <p class="subtitle">Maak van elke afbeelding een mooi strijkkralen patroon!</p>
+
+    <div class="container">
+        <div class="upload-section" id="uploadSection">
+            <input type="file" id="fileInput" accept="image/*">
+            <button class="upload-btn" onclick="document.getElementById('fileInput').click()">
+                Kies een afbeelding
+            </button>
+            <p class="upload-text">Of sleep een afbeelding hierheen</p>
+        </div>
+
+        <div class="settings">
+            <div class="setting-group">
+                <label for="colorCount">Aantal kleuren:</label>
+                <select id="colorCount">
+                    <option value="4">4 kleuren</option>
+                    <option value="5">5 kleuren</option>
+                    <option value="6" selected>6 kleuren</option>
+                    <option value="7">7 kleuren</option>
+                    <option value="8">8 kleuren</option>
+                </select>
+            </div>
+            <div class="setting-group">
+                <label for="showSymbols">Toon symbolen:</label>
+                <input type="checkbox" id="showSymbols" checked>
+            </div>
+        </div>
+
+        <div class="preview-section" id="previewSection">
+            <div class="preview-container">
+                <div class="preview-box">
+                    <h3>Originele afbeelding</h3>
+                    <img id="originalPreview" src="" alt="Origineel">
+                </div>
+            </div>
+        </div>
+
+        <div class="pattern-section" id="patternSection">
+            <div class="pattern-header">
+                <h2>Jouw Strijkkralen Patroon</h2>
+                <div class="action-buttons">
+                    <button class="action-btn print-btn" onclick="window.print()">
+                        Afdrukken
+                    </button>
+                    <button class="action-btn reset-btn" onclick="resetAll()">
+                        Opnieuw
+                    </button>
+                </div>
+            </div>
+
+            <div class="pattern-wrapper">
+                <div class="grid-container">
+                    <div id="patternGrid"></div>
+                </div>
+                <div class="legend" id="legend">
+                    <h3>Kleuren Legenda</h3>
+                </div>
+            </div>
+
+            <div class="instructions">
+                <h3>Zo gebruik je dit patroon:</h3>
+                <ul>
+                    <li>Pak een strijkkralen grondplaat van 30x30 puntjes</li>
+                    <li>Kijk naar het symbool of nummer in elk vakje</li>
+                    <li>Zoek de juiste kleur in de legenda hiernaast</li>
+                    <li>Plaats de kraal van die kleur op het juiste plekje</li>
+                    <li>Begin linksboven en werk rij voor rij naar beneden</li>
+                    <li>Vraag een volwassene om te helpen met strijken!</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <canvas id="processCanvas" style="display: none;"></canvas>
+
+    <script>
+        // Symbolen die makkelijk te onderscheiden zijn voor kinderen
+        const SYMBOLS = ['●', '■', '▲', '★', '♦', '♥', '○', '□'];
+
+        // Basis kleuren palet met Nederlandse namen
+        const COLOR_PALETTE = [
+            { hex: '#FF0000', name: 'Rood' },
+            { hex: '#0000FF', name: 'Blauw' },
+            { hex: '#FFFF00', name: 'Geel' },
+            { hex: '#00FF00', name: 'Groen' },
+            { hex: '#FF8000', name: 'Oranje' },
+            { hex: '#FF00FF', name: 'Roze' },
+            { hex: '#800080', name: 'Paars' },
+            { hex: '#00FFFF', name: 'Lichtblauw' },
+            { hex: '#8B4513', name: 'Bruin' },
+            { hex: '#FFC0CB', name: 'Lichtroze' },
+            { hex: '#000000', name: 'Zwart' },
+            { hex: '#FFFFFF', name: 'Wit' },
+            { hex: '#808080', name: 'Grijs' },
+            { hex: '#90EE90', name: 'Lichtgroen' },
+            { hex: '#FFD700', name: 'Goud' },
+            { hex: '#C0C0C0', name: 'Zilver' }
+        ];
+
+        const GRID_SIZE = 30;
+        let currentPattern = null;
+
+        // Drag and drop
+        const uploadSection = document.getElementById('uploadSection');
+
+        uploadSection.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadSection.classList.add('dragover');
+        });
+
+        uploadSection.addEventListener('dragleave', () => {
+            uploadSection.classList.remove('dragover');
+        });
+
+        uploadSection.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadSection.classList.remove('dragover');
+            const file = e.dataTransfer.files[0];
+            if (file && file.type.startsWith('image/')) {
+                processImage(file);
+            }
+        });
+
+        document.getElementById('fileInput').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                processImage(file);
+            }
+        });
+
+        document.getElementById('colorCount').addEventListener('change', () => {
+            if (currentPattern) {
+                regeneratePattern();
+            }
+        });
+
+        document.getElementById('showSymbols').addEventListener('change', () => {
+            if (currentPattern) {
+                displayPattern(currentPattern.colors, currentPattern.pixelData);
+            }
+        });
+
+        function processImage(file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    // Toon preview
+                    document.getElementById('originalPreview').src = e.target.result;
+                    document.getElementById('previewSection').classList.add('visible');
+
+                    // Verwerk afbeelding
+                    const pixelData = resizeAndGetPixels(img);
+                    const colorCount = parseInt(document.getElementById('colorCount').value);
+                    const { colors, mappedPixels } = reduceColors(pixelData, colorCount);
+
+                    currentPattern = {
+                        originalImage: img,
+                        pixelData: mappedPixels,
+                        colors: colors
+                    };
+
+                    displayPattern(colors, mappedPixels);
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function resizeAndGetPixels(img) {
+            const canvas = document.getElementById('processCanvas');
+            const ctx = canvas.getContext('2d');
+
+            canvas.width = GRID_SIZE;
+            canvas.height = GRID_SIZE;
+
+            // Teken afbeelding geschaald naar 30x30
+            ctx.drawImage(img, 0, 0, GRID_SIZE, GRID_SIZE);
+
+            const imageData = ctx.getImageData(0, 0, GRID_SIZE, GRID_SIZE);
+            const pixels = [];
+
+            for (let y = 0; y < GRID_SIZE; y++) {
+                const row = [];
+                for (let x = 0; x < GRID_SIZE; x++) {
+                    const i = (y * GRID_SIZE + x) * 4;
+                    row.push({
+                        r: imageData.data[i],
+                        g: imageData.data[i + 1],
+                        b: imageData.data[i + 2]
+                    });
+                }
+                pixels.push(row);
+            }
+
+            return pixels;
+        }
+
+        function colorDistance(c1, c2) {
+            // Gewogen Euclidische afstand (menselijk oog is gevoeliger voor groen)
+            const rDiff = c1.r - c2.r;
+            const gDiff = c1.g - c2.g;
+            const bDiff = c1.b - c2.b;
+            return Math.sqrt(rDiff * rDiff * 0.3 + gDiff * gDiff * 0.59 + bDiff * bDiff * 0.11);
+        }
+
+        function hexToRgb(hex) {
+            const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+            return result ? {
+                r: parseInt(result[1], 16),
+                g: parseInt(result[2], 16),
+                b: parseInt(result[3], 16)
+            } : null;
+        }
+
+        function rgbToHex(r, g, b) {
+            return '#' + [r, g, b].map(x => {
+                const hex = Math.round(x).toString(16);
+                return hex.length === 1 ? '0' + hex : hex;
+            }).join('').toUpperCase();
+        }
+
+        function reduceColors(pixels, maxColors) {
+            // Verzamel alle unieke kleuren en tel ze
+            const colorCounts = new Map();
+
+            for (let y = 0; y < GRID_SIZE; y++) {
+                for (let x = 0; x < GRID_SIZE; x++) {
+                    const pixel = pixels[y][x];
+                    const key = `${pixel.r},${pixel.g},${pixel.b}`;
+                    colorCounts.set(key, (colorCounts.get(key) || 0) + 1);
+                }
+            }
+
+            // Converteer naar array en sorteer op frequentie
+            const uniqueColors = Array.from(colorCounts.entries())
+                .map(([key, count]) => {
+                    const [r, g, b] = key.split(',').map(Number);
+                    return { r, g, b, count };
+                })
+                .sort((a, b) => b.count - a.count);
+
+            // Gebruik median cut algoritme voor kleurreductie
+            let colorBuckets = [uniqueColors];
+
+            while (colorBuckets.length < maxColors && colorBuckets.some(b => b.length > 1)) {
+                // Vind de bucket met de grootste spreiding
+                let maxSpread = -1;
+                let bucketToSplit = -1;
+                let splitChannel = 'r';
+
+                for (let i = 0; i < colorBuckets.length; i++) {
+                    if (colorBuckets[i].length <= 1) continue;
+
+                    const bucket = colorBuckets[i];
+                    for (const channel of ['r', 'g', 'b']) {
+                        const values = bucket.map(c => c[channel]);
+                        const spread = Math.max(...values) - Math.min(...values);
+                        if (spread > maxSpread) {
+                            maxSpread = spread;
+                            bucketToSplit = i;
+                            splitChannel = channel;
+                        }
+                    }
+                }
+
+                if (bucketToSplit === -1) break;
+
+                // Splits de bucket
+                const bucket = colorBuckets[bucketToSplit];
+                bucket.sort((a, b) => a[splitChannel] - b[splitChannel]);
+                const mid = Math.floor(bucket.length / 2);
+
+                colorBuckets.splice(bucketToSplit, 1,
+                    bucket.slice(0, mid),
+                    bucket.slice(mid)
+                );
+            }
+
+            // Bereken gemiddelde kleur per bucket en match met palet
+            const reducedColors = colorBuckets
+                .filter(bucket => bucket.length > 0)
+                .map(bucket => {
+                    const totalWeight = bucket.reduce((sum, c) => sum + c.count, 0);
+                    const avgR = bucket.reduce((sum, c) => sum + c.r * c.count, 0) / totalWeight;
+                    const avgG = bucket.reduce((sum, c) => sum + c.g * c.count, 0) / totalWeight;
+                    const avgB = bucket.reduce((sum, c) => sum + c.b * c.count, 0) / totalWeight;
+
+                    return { r: avgR, g: avgG, b: avgB };
+                });
+
+            // Match elke gereduceerde kleur met de dichtstbijzijnde palet kleur
+            const paletteRgb = COLOR_PALETTE.map(c => ({
+                ...hexToRgb(c.hex),
+                hex: c.hex,
+                name: c.name
+            }));
+
+            const finalColors = reducedColors.map(color => {
+                let minDist = Infinity;
+                let bestMatch = paletteRgb[0];
+
+                for (const paletteColor of paletteRgb) {
+                    const dist = colorDistance(color, paletteColor);
+                    if (dist < minDist) {
+                        minDist = dist;
+                        bestMatch = paletteColor;
+                    }
+                }
+
+                return {
+                    original: color,
+                    matched: bestMatch
+                };
+            });
+
+            // Verwijder dubbele matches
+            const usedHexes = new Set();
+            const uniqueFinalColors = [];
+
+            for (const color of finalColors) {
+                if (!usedHexes.has(color.matched.hex)) {
+                    usedHexes.add(color.matched.hex);
+                    uniqueFinalColors.push(color);
+                }
+            }
+
+            // Map elke pixel naar de dichtstbijzijnde finale kleur
+            const mappedPixels = [];
+            const colorUsage = new Map();
+
+            for (let y = 0; y < GRID_SIZE; y++) {
+                const row = [];
+                for (let x = 0; x < GRID_SIZE; x++) {
+                    const pixel = pixels[y][x];
+                    let minDist = Infinity;
+                    let bestIndex = 0;
+
+                    for (let i = 0; i < uniqueFinalColors.length; i++) {
+                        const dist = colorDistance(pixel, uniqueFinalColors[i].original);
+                        if (dist < minDist) {
+                            minDist = dist;
+                            bestIndex = i;
+                        }
+                    }
+
+                    row.push(bestIndex);
+
+                    const hex = uniqueFinalColors[bestIndex].matched.hex;
+                    colorUsage.set(hex, (colorUsage.get(hex) || 0) + 1);
+                }
+                mappedPixels.push(row);
+            }
+
+            // Voeg usage toe aan colors
+            const colorsWithUsage = uniqueFinalColors.map((c, i) => ({
+                ...c.matched,
+                symbol: SYMBOLS[i],
+                index: i,
+                count: colorUsage.get(c.matched.hex) || 0
+            }));
+
+            return {
+                colors: colorsWithUsage,
+                mappedPixels
+            };
+        }
+
+        function displayPattern(colors, mappedPixels) {
+            const grid = document.getElementById('patternGrid');
+            const legend = document.getElementById('legend');
+            const showSymbols = document.getElementById('showSymbols').checked;
+
+            // Clear grid
+            grid.innerHTML = '';
+
+            // Bouw grid
+            for (let y = 0; y < GRID_SIZE; y++) {
+                for (let x = 0; x < GRID_SIZE; x++) {
+                    const colorIndex = mappedPixels[y][x];
+                    const color = colors[colorIndex];
+
+                    const cell = document.createElement('div');
+                    cell.className = 'grid-cell';
+                    cell.style.backgroundColor = color.hex;
+
+                    if (showSymbols) {
+                        cell.textContent = color.symbol;
+                        // Maak tekst leesbaar op donkere/lichte achtergronden
+                        const rgb = hexToRgb(color.hex);
+                        const brightness = (rgb.r * 299 + rgb.g * 587 + rgb.b * 114) / 1000;
+                        cell.style.color = brightness > 128 ? '#000' : '#fff';
+                        cell.style.textShadow = brightness > 128
+                            ? '0 0 2px white, 0 0 2px white'
+                            : '0 0 2px black, 0 0 2px black';
+                    }
+
+                    grid.appendChild(cell);
+                }
+            }
+
+            // Bouw legenda
+            legend.innerHTML = '<h3>Kleuren Legenda</h3>';
+
+            colors.forEach((color, index) => {
+                const item = document.createElement('div');
+                item.className = 'legend-item';
+
+                const colorBox = document.createElement('div');
+                colorBox.className = 'legend-color';
+                colorBox.style.backgroundColor = color.hex;
+                colorBox.textContent = color.symbol;
+
+                const rgb = hexToRgb(color.hex);
+                const brightness = (rgb.r * 299 + rgb.g * 587 + rgb.b * 114) / 1000;
+                colorBox.style.color = brightness > 128 ? '#000' : '#fff';
+
+                const info = document.createElement('div');
+                info.className = 'legend-info';
+                info.innerHTML = `
+                    <div class="legend-name">${color.name}</div>
+                    <div class="legend-count">${color.count} kraaltjes</div>
+                `;
+
+                item.appendChild(colorBox);
+                item.appendChild(info);
+                legend.appendChild(item);
+            });
+
+            document.getElementById('patternSection').classList.add('visible');
+        }
+
+        function regeneratePattern() {
+            if (currentPattern && currentPattern.originalImage) {
+                const pixelData = resizeAndGetPixels(currentPattern.originalImage);
+                const colorCount = parseInt(document.getElementById('colorCount').value);
+                const { colors, mappedPixels } = reduceColors(pixelData, colorCount);
+
+                currentPattern.pixelData = mappedPixels;
+                currentPattern.colors = colors;
+
+                displayPattern(colors, mappedPixels);
+            }
+        }
+
+        function resetAll() {
+            currentPattern = null;
+            document.getElementById('fileInput').value = '';
+            document.getElementById('previewSection').classList.remove('visible');
+            document.getElementById('patternSection').classList.remove('visible');
+            document.getElementById('patternGrid').innerHTML = '';
+            document.getElementById('legend').innerHTML = '<h3>Kleuren Legenda</h3>';
+        }
+    </script>
+</body>
+</html>
