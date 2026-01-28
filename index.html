@@ -375,7 +375,7 @@
 </head>
 <body>
     <h1>Strijkkralen Patroon Maker</h1>
-    <p class="subtitle">Maak van elke afbeelding een mooi strijkkralen patroon!</p>
+    <p class="subtitle">Maak van elke afbeelding een mooi strijkkralen patroon! <small style="opacity:0.5">(v2)</small></p>
 
     <div class="container">
         <div class="upload-section" id="uploadSection">
@@ -564,10 +564,17 @@
 
         function resizeAndGetPixels(img) {
             const canvas = document.getElementById('processCanvas');
-            const ctx = canvas.getContext('2d');
+            const ctx = canvas.getContext('2d', { willReadFrequently: true });
 
             canvas.width = GRID_SIZE;
             canvas.height = GRID_SIZE;
+
+            // Vul eerst met wit (voor transparante afbeeldingen)
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(0, 0, GRID_SIZE, GRID_SIZE);
+
+            // Zet image smoothing uit voor scherpere pixels
+            ctx.imageSmoothingEnabled = false;
 
             // Teken afbeelding geschaald naar 30x30
             ctx.drawImage(img, 0, 0, GRID_SIZE, GRID_SIZE);
@@ -579,10 +586,13 @@
                 const row = [];
                 for (let x = 0; x < GRID_SIZE; x++) {
                     const i = (y * GRID_SIZE + x) * 4;
+                    const alpha = imageData.data[i + 3] / 255;
+
+                    // Blend met wit als er transparantie is
                     row.push({
-                        r: imageData.data[i],
-                        g: imageData.data[i + 1],
-                        b: imageData.data[i + 2]
+                        r: Math.round(imageData.data[i] * alpha + 255 * (1 - alpha)),
+                        g: Math.round(imageData.data[i + 1] * alpha + 255 * (1 - alpha)),
+                        b: Math.round(imageData.data[i + 2] * alpha + 255 * (1 - alpha))
                     });
                 }
                 pixels.push(row);
@@ -592,19 +602,11 @@
         }
 
         function colorDistance(c1, c2) {
-            // Verbeterde kleurafstand berekening (redmean approximation)
-            // Beter voor visuele kleurgelijkheid dan standaard Euclidische afstand
-            const rMean = (c1.r + c2.r) / 2;
+            // Standaard Euclidische afstand in RGB ruimte
             const rDiff = c1.r - c2.r;
             const gDiff = c1.g - c2.g;
             const bDiff = c1.b - c2.b;
-
-            // Gewichten gebaseerd op gemiddelde roodwaarde
-            const rWeight = 2 + rMean / 256;
-            const gWeight = 4;
-            const bWeight = 2 + (255 - rMean) / 256;
-
-            return Math.sqrt(rWeight * rDiff * rDiff + gWeight * gDiff * gDiff + bWeight * bDiff * bDiff);
+            return Math.sqrt(rDiff * rDiff + gDiff * gDiff + bDiff * bDiff);
         }
 
         function hexToRgb(hex) {
