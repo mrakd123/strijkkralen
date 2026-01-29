@@ -216,7 +216,6 @@
 
         #patternGrid {
             display: grid;
-            grid-template-columns: repeat(30, 1fr);
             gap: 1px;
             background: #333;
             padding: 1px;
@@ -375,7 +374,7 @@
 </head>
 <body>
     <h1>Strijkkralen Patroon Maker</h1>
-    <p class="subtitle">Maak van elke afbeelding een mooi strijkkralen patroon! <small style="opacity:0.5">(v2)</small></p>
+    <p class="subtitle">Maak van elke afbeelding een mooi strijkkralen patroon! <small style="opacity:0.5">(v3 - Pixel Art)</small></p>
 
     <div class="container">
         <div class="upload-section" id="uploadSection">
@@ -395,7 +394,22 @@
                     <option value="6" selected>6 kleuren</option>
                     <option value="7">7 kleuren</option>
                     <option value="8">8 kleuren</option>
+                    <option value="10">10 kleuren</option>
+                    <option value="12">12 kleuren</option>
                 </select>
+            </div>
+            <div class="setting-group">
+                <label for="gridSize">Grootte:</label>
+                <select id="gridSize">
+                    <option value="20">20x20 (klein)</option>
+                    <option value="25">25x25</option>
+                    <option value="30" selected>30x30 (standaard)</option>
+                    <option value="40">40x40 (groot)</option>
+                </select>
+            </div>
+            <div class="setting-group">
+                <label for="pixelArtMode">Pixel Art modus:</label>
+                <input type="checkbox" id="pixelArtMode" checked>
             </div>
             <div class="setting-group">
                 <label for="showSymbols">Toon symbolen:</label>
@@ -437,13 +451,14 @@
             <div class="instructions">
                 <h3>Zo gebruik je dit patroon:</h3>
                 <ul>
-                    <li>Pak een strijkkralen grondplaat van 30x30 puntjes</li>
-                    <li>Kijk naar het symbool of nummer in elk vakje</li>
+                    <li>Pak een strijkkralen grondplaat van de juiste grootte (zie legenda)</li>
+                    <li>Kijk naar het symbool in elk vakje</li>
                     <li>Zoek de juiste kleur in de legenda hiernaast</li>
                     <li>Plaats de kraal van die kleur op het juiste plekje</li>
                     <li>Begin linksboven en werk rij voor rij naar beneden</li>
                     <li>Vraag een volwassene om te helpen met strijken!</li>
                 </ul>
+                <p style="margin-top:15px;font-size:0.9em;"><strong>Tip:</strong> Gebruik "Pixel Art modus" voor afbeeldingen met scherpe randen (zoals game sprites). Zet het uit voor foto's.</p>
             </div>
         </div>
     </div>
@@ -452,7 +467,7 @@
 
     <script>
         // Symbolen die makkelijk te onderscheiden zijn voor kinderen
-        const SYMBOLS = ['●', '■', '▲', '★', '♦', '♥', '○', '□'];
+        const SYMBOLS = ['●', '■', '▲', '★', '♦', '♥', '○', '□', '◆', '▼', '⬟', '✚'];
 
         // Uitgebreid kleuren palet met Nederlandse namen (echte strijkkralen kleuren)
         const COLOR_PALETTE = [
@@ -492,7 +507,7 @@
             { hex: '#404040', name: 'Donkergrijs' }
         ];
 
-        const GRID_SIZE = 30;
+        let GRID_SIZE = 30;
         let currentPattern = null;
 
         // Drag and drop
@@ -524,6 +539,19 @@
         });
 
         document.getElementById('colorCount').addEventListener('change', () => {
+            if (currentPattern) {
+                regeneratePattern();
+            }
+        });
+
+        document.getElementById('gridSize').addEventListener('change', () => {
+            if (currentPattern) {
+                GRID_SIZE = parseInt(document.getElementById('gridSize').value);
+                regeneratePattern();
+            }
+        });
+
+        document.getElementById('pixelArtMode').addEventListener('change', () => {
             if (currentPattern) {
                 regeneratePattern();
             }
@@ -565,35 +593,110 @@
         function resizeAndGetPixels(img) {
             const canvas = document.getElementById('processCanvas');
             const ctx = canvas.getContext('2d', { willReadFrequently: true });
+            const pixelArtMode = document.getElementById('pixelArtMode').checked;
 
-            canvas.width = GRID_SIZE;
-            canvas.height = GRID_SIZE;
-
-            // Vul eerst met wit (voor transparante afbeeldingen)
+            // Eerst de afbeelding op originele grootte laden
+            canvas.width = img.width;
+            canvas.height = img.height;
             ctx.fillStyle = '#FFFFFF';
-            ctx.fillRect(0, 0, GRID_SIZE, GRID_SIZE);
+            ctx.fillRect(0, 0, img.width, img.height);
+            ctx.drawImage(img, 0, 0);
 
-            // Zet image smoothing uit voor scherpere pixels
-            ctx.imageSmoothingEnabled = false;
+            const srcData = ctx.getImageData(0, 0, img.width, img.height);
+            const srcPixels = srcData.data;
 
-            // Teken afbeelding geschaald naar 30x30
-            ctx.drawImage(img, 0, 0, GRID_SIZE, GRID_SIZE);
+            // Bereken schalingsfactor
+            const scaleX = img.width / GRID_SIZE;
+            const scaleY = img.height / GRID_SIZE;
 
-            const imageData = ctx.getImageData(0, 0, GRID_SIZE, GRID_SIZE);
             const pixels = [];
 
             for (let y = 0; y < GRID_SIZE; y++) {
                 const row = [];
                 for (let x = 0; x < GRID_SIZE; x++) {
-                    const i = (y * GRID_SIZE + x) * 4;
-                    const alpha = imageData.data[i + 3] / 255;
+                    // Bepaal het brongebied voor deze cel
+                    const srcX1 = Math.floor(x * scaleX);
+                    const srcY1 = Math.floor(y * scaleY);
+                    const srcX2 = Math.min(Math.floor((x + 1) * scaleX), img.width);
+                    const srcY2 = Math.min(Math.floor((y + 1) * scaleY), img.height);
 
-                    // Blend met wit als er transparantie is
-                    row.push({
-                        r: Math.round(imageData.data[i] * alpha + 255 * (1 - alpha)),
-                        g: Math.round(imageData.data[i + 1] * alpha + 255 * (1 - alpha)),
-                        b: Math.round(imageData.data[i + 2] * alpha + 255 * (1 - alpha))
-                    });
+                    if (pixelArtMode) {
+                        // Pixel Art Modus: Neem de meest voorkomende kleur in het gebied
+                        // Dit behoudt scherpe randen beter dan gemiddelde
+                        const colorCounts = new Map();
+                        let maxCount = 0;
+                        let dominantColor = { r: 255, g: 255, b: 255 };
+
+                        for (let sy = srcY1; sy < srcY2; sy++) {
+                            for (let sx = srcX1; sx < srcX2; sx++) {
+                                const i = (sy * img.width + sx) * 4;
+                                const alpha = srcPixels[i + 3] / 255;
+                                const r = Math.round(srcPixels[i] * alpha + 255 * (1 - alpha));
+                                const g = Math.round(srcPixels[i + 1] * alpha + 255 * (1 - alpha));
+                                const b = Math.round(srcPixels[i + 2] * alpha + 255 * (1 - alpha));
+
+                                // Quantiseer kleur voor betere groepering (naar 32 levels per kanaal)
+                                const qr = Math.round(r / 8) * 8;
+                                const qg = Math.round(g / 8) * 8;
+                                const qb = Math.round(b / 8) * 8;
+                                const key = `${qr},${qg},${qb}`;
+
+                                const count = (colorCounts.get(key) || 0) + 1;
+                                colorCounts.set(key, count);
+
+                                if (count > maxCount) {
+                                    maxCount = count;
+                                    dominantColor = { r, g, b };
+                                }
+                            }
+                        }
+                        row.push(dominantColor);
+                    } else {
+                        // Standaard modus: Gemiddelde kleur met edge-detectie boost
+                        let rSum = 0, gSum = 0, bSum = 0;
+                        let count = 0;
+                        let minLum = 255, maxLum = 0;
+
+                        for (let sy = srcY1; sy < srcY2; sy++) {
+                            for (let sx = srcX1; sx < srcX2; sx++) {
+                                const i = (sy * img.width + sx) * 4;
+                                const alpha = srcPixels[i + 3] / 255;
+                                const r = srcPixels[i] * alpha + 255 * (1 - alpha);
+                                const g = srcPixels[i + 1] * alpha + 255 * (1 - alpha);
+                                const b = srcPixels[i + 2] * alpha + 255 * (1 - alpha);
+
+                                rSum += r;
+                                gSum += g;
+                                bSum += b;
+                                count++;
+
+                                // Track luminantie range voor contrast
+                                const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+                                minLum = Math.min(minLum, lum);
+                                maxLum = Math.max(maxLum, lum);
+                            }
+                        }
+
+                        let r = rSum / count;
+                        let g = gSum / count;
+                        let b = bSum / count;
+
+                        // Als er hoog contrast is in dit gebied, boost de saturatie
+                        const contrast = maxLum - minLum;
+                        if (contrast > 50) {
+                            const factor = 1.2;
+                            const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+                            r = Math.min(255, Math.max(0, gray + (r - gray) * factor));
+                            g = Math.min(255, Math.max(0, gray + (g - gray) * factor));
+                            b = Math.min(255, Math.max(0, gray + (b - gray) * factor));
+                        }
+
+                        row.push({
+                            r: Math.round(r),
+                            g: Math.round(g),
+                            b: Math.round(b)
+                        });
+                    }
                 }
                 pixels.push(row);
             }
@@ -601,12 +704,49 @@
             return pixels;
         }
 
+        // RGB naar LAB conversie voor perceptuele kleurdistantie
+        function rgbToLab(r, g, b) {
+            // RGB naar XYZ
+            let rr = r / 255, gg = g / 255, bb = b / 255;
+            rr = rr > 0.04045 ? Math.pow((rr + 0.055) / 1.055, 2.4) : rr / 12.92;
+            gg = gg > 0.04045 ? Math.pow((gg + 0.055) / 1.055, 2.4) : gg / 12.92;
+            bb = bb > 0.04045 ? Math.pow((bb + 0.055) / 1.055, 2.4) : bb / 12.92;
+
+            const x = (rr * 0.4124 + gg * 0.3576 + bb * 0.1805) / 0.95047;
+            const y = (rr * 0.2126 + gg * 0.7152 + bb * 0.0722) / 1.0;
+            const z = (rr * 0.0193 + gg * 0.1192 + bb * 0.9505) / 1.08883;
+
+            const fx = x > 0.008856 ? Math.pow(x, 1/3) : (7.787 * x) + 16/116;
+            const fy = y > 0.008856 ? Math.pow(y, 1/3) : (7.787 * y) + 16/116;
+            const fz = z > 0.008856 ? Math.pow(z, 1/3) : (7.787 * z) + 16/116;
+
+            return {
+                L: (116 * fy) - 16,
+                a: 500 * (fx - fy),
+                b: 200 * (fy - fz)
+            };
+        }
+
         function colorDistance(c1, c2) {
-            // Standaard Euclidische afstand in RGB ruimte
+            // CIEDE2000-achtige perceptuele afstand (vereenvoudigd)
+            const lab1 = rgbToLab(c1.r, c1.g, c1.b);
+            const lab2 = rgbToLab(c2.r, c2.g, c2.b);
+
+            const dL = lab1.L - lab2.L;
+            const da = lab1.a - lab2.a;
+            const db = lab1.b - lab2.b;
+
+            // Weging: luminantie is minder belangrijk dan chrominantie voor herkenning
+            return Math.sqrt(dL * dL * 0.5 + da * da + db * db);
+        }
+
+        // Snelle RGB afstand voor performance-kritieke secties
+        function colorDistanceFast(c1, c2) {
+            // Gewogen RGB afstand (menselijke oog is gevoeliger voor groen)
             const rDiff = c1.r - c2.r;
             const gDiff = c1.g - c2.g;
             const bDiff = c1.b - c2.b;
-            return Math.sqrt(rDiff * rDiff + gDiff * gDiff + bDiff * bDiff);
+            return Math.sqrt(rDiff * rDiff * 0.3 + gDiff * gDiff * 0.59 + bDiff * bDiff * 0.11);
         }
 
         function hexToRgb(hex) {
@@ -626,16 +766,23 @@
         }
 
         function reduceColors(pixels, maxColors) {
-            // Converteer palet naar RGB
-            const paletteRgb = COLOR_PALETTE.map(c => ({
-                ...hexToRgb(c.hex),
-                hex: c.hex,
-                name: c.name
-            }));
+            const pixelArtMode = document.getElementById('pixelArtMode').checked;
+
+            // Converteer palet naar RGB met LAB cache
+            const paletteRgb = COLOR_PALETTE.map(c => {
+                const rgb = hexToRgb(c.hex);
+                return {
+                    ...rgb,
+                    hex: c.hex,
+                    name: c.name,
+                    lab: rgbToLab(rgb.r, rgb.g, rgb.b)
+                };
+            });
 
             // STAP 1: Match elke pixel direct met dichtstbijzijnde palet kleur
             const paletteUsage = new Map();
             const pixelPaletteMap = [];
+            const pixelImportance = new Map(); // Track kleurbelang (rand-pixels tellen zwaarder)
 
             for (let y = 0; y < GRID_SIZE; y++) {
                 const row = [];
@@ -654,16 +801,83 @@
 
                     row.push(bestPaletteIndex);
                     const hex = paletteRgb[bestPaletteIndex].hex;
-                    paletteUsage.set(hex, (paletteUsage.get(hex) || 0) + 1);
+
+                    // Bereken importance: rand-pixels zijn belangrijker
+                    let importance = 1;
+                    if (pixelArtMode && x > 0 && y > 0 && x < GRID_SIZE - 1 && y < GRID_SIZE - 1) {
+                        // Check of dit een rand-pixel is (heeft buren met andere kleur)
+                        const neighbors = [
+                            pixels[y-1]?.[x], pixels[y+1]?.[x],
+                            pixels[y][x-1], pixels[y][x+1]
+                        ].filter(Boolean);
+
+                        for (const neighbor of neighbors) {
+                            if (colorDistanceFast(pixel, neighbor) > 30) {
+                                importance = 3; // Rand-pixels tellen 3x zo zwaar
+                                break;
+                            }
+                        }
+                    }
+
+                    paletteUsage.set(hex, (paletteUsage.get(hex) || 0) + importance);
+                    pixelImportance.set(`${x},${y}`, importance);
                 }
                 pixelPaletteMap.push(row);
             }
 
-            // STAP 2: Selecteer de top N meest gebruikte kleuren
-            const sortedColors = Array.from(paletteUsage.entries())
-                .sort((a, b) => b[1] - a[1])
-                .slice(0, maxColors)
-                .map(([hex]) => paletteRgb.find(c => c.hex === hex));
+            // STAP 2: Selecteer kleuren met contrast-bewuste selectie
+            const allColors = Array.from(paletteUsage.entries())
+                .map(([hex, count]) => ({
+                    color: paletteRgb.find(c => c.hex === hex),
+                    count
+                }))
+                .sort((a, b) => b.count - a.count);
+
+            const selectedColors = [];
+
+            // Prioriteit voor zwart en wit als ze veel voorkomen (essentieel voor pixel art)
+            const blackIdx = allColors.findIndex(c => c.color.hex === '#000000');
+            const whiteIdx = allColors.findIndex(c => c.color.hex === '#FFFFFF');
+
+            if (pixelArtMode) {
+                // Voeg zwart toe als het significant voorkomt
+                if (blackIdx !== -1 && allColors[blackIdx].count > GRID_SIZE * 2) {
+                    selectedColors.push(allColors[blackIdx].color);
+                    allColors.splice(blackIdx, 1);
+                }
+                // Voeg wit toe als het significant voorkomt
+                const newWhiteIdx = allColors.findIndex(c => c.color.hex === '#FFFFFF');
+                if (newWhiteIdx !== -1 && allColors[newWhiteIdx].count > GRID_SIZE * 2) {
+                    selectedColors.push(allColors[newWhiteIdx].color);
+                    allColors.splice(newWhiteIdx, 1);
+                }
+            }
+
+            // Voeg overige kleuren toe met diversiteitscheck
+            for (const item of allColors) {
+                if (selectedColors.length >= maxColors) break;
+
+                // Check of deze kleur voldoende verschilt van al geselecteerde kleuren
+                let tooSimilar = false;
+                for (const selected of selectedColors) {
+                    if (colorDistance(item.color, selected) < 25) {
+                        tooSimilar = true;
+                        break;
+                    }
+                }
+
+                if (!tooSimilar) {
+                    selectedColors.push(item.color);
+                }
+            }
+
+            // Als we nog niet genoeg kleuren hebben, voeg de meest voorkomende toe
+            for (const item of allColors) {
+                if (selectedColors.length >= maxColors) break;
+                if (!selectedColors.includes(item.color)) {
+                    selectedColors.push(item.color);
+                }
+            }
 
             // STAP 3: Hermap elke pixel naar alleen de geselecteerde kleuren
             const mappedPixels = [];
@@ -676,8 +890,8 @@
                     let minDist = Infinity;
                     let bestIndex = 0;
 
-                    for (let i = 0; i < sortedColors.length; i++) {
-                        const dist = colorDistance(pixel, sortedColors[i]);
+                    for (let i = 0; i < selectedColors.length; i++) {
+                        const dist = colorDistance(pixel, selectedColors[i]);
                         if (dist < minDist) {
                             minDist = dist;
                             bestIndex = i;
@@ -685,19 +899,38 @@
                     }
 
                     row.push(bestIndex);
-                    const hex = sortedColors[bestIndex].hex;
+                    const hex = selectedColors[bestIndex].hex;
                     finalColorUsage.set(hex, (finalColorUsage.get(hex) || 0) + 1);
                 }
                 mappedPixels.push(row);
             }
 
-            // STAP 4: Bouw finale kleuren array met symbolen en counts
-            const colorsWithUsage = sortedColors.map((color, i) => ({
-                ...color,
-                symbol: SYMBOLS[i],
-                index: i,
-                count: finalColorUsage.get(color.hex) || 0
-            }));
+            // STAP 4: Sorteer kleuren op gebruik en bouw finale array
+            const colorsWithUsage = selectedColors
+                .map((color, i) => ({
+                    ...color,
+                    symbol: SYMBOLS[i % SYMBOLS.length],
+                    index: i,
+                    count: finalColorUsage.get(color.hex) || 0
+                }))
+                .sort((a, b) => b.count - a.count)
+                .map((color, i) => ({
+                    ...color,
+                    symbol: SYMBOLS[i % SYMBOLS.length],
+                    index: i
+                }));
+
+            // Update mapped pixels met nieuwe indices na sorteren
+            const colorIndexMap = new Map();
+            colorsWithUsage.forEach((c, i) => colorIndexMap.set(c.hex, i));
+
+            for (let y = 0; y < GRID_SIZE; y++) {
+                for (let x = 0; x < GRID_SIZE; x++) {
+                    const oldIndex = mappedPixels[y][x];
+                    const hex = selectedColors[oldIndex].hex;
+                    mappedPixels[y][x] = colorIndexMap.get(hex);
+                }
+            }
 
             return {
                 colors: colorsWithUsage,
@@ -709,19 +942,28 @@
             const grid = document.getElementById('patternGrid');
             const legend = document.getElementById('legend');
             const showSymbols = document.getElementById('showSymbols').checked;
+            const currentGridSize = mappedPixels.length;
 
-            // Clear grid
+            // Clear grid en pas CSS aan voor dynamische grootte
             grid.innerHTML = '';
+            grid.style.gridTemplateColumns = `repeat(${currentGridSize}, 1fr)`;
+
+            // Pas cel grootte aan op basis van grid grootte
+            const cellSize = currentGridSize > 30 ? 15 : 20;
+            const fontSize = currentGridSize > 30 ? 8 : 10;
 
             // Bouw grid
-            for (let y = 0; y < GRID_SIZE; y++) {
-                for (let x = 0; x < GRID_SIZE; x++) {
+            for (let y = 0; y < currentGridSize; y++) {
+                for (let x = 0; x < currentGridSize; x++) {
                     const colorIndex = mappedPixels[y][x];
                     const color = colors[colorIndex];
 
                     const cell = document.createElement('div');
                     cell.className = 'grid-cell';
                     cell.style.backgroundColor = color.hex;
+                    cell.style.width = cellSize + 'px';
+                    cell.style.height = cellSize + 'px';
+                    cell.style.fontSize = fontSize + 'px';
 
                     if (showSymbols) {
                         cell.textContent = color.symbol;
@@ -739,7 +981,8 @@
             }
 
             // Bouw legenda
-            legend.innerHTML = '<h3>Kleuren Legenda</h3>';
+            const totalBeads = colors.reduce((sum, c) => sum + c.count, 0);
+            legend.innerHTML = `<h3>Kleuren Legenda</h3><p style="text-align:center;color:#666;margin:0 0 15px 0;font-size:0.9em;">Totaal: ${totalBeads} kraaltjes (${currentGridSize}x${currentGridSize})</p>`;
 
             colors.forEach((color, index) => {
                 const item = document.createElement('div');
@@ -771,6 +1014,7 @@
 
         function regeneratePattern() {
             if (currentPattern && currentPattern.originalImage) {
+                GRID_SIZE = parseInt(document.getElementById('gridSize').value);
                 const pixelData = resizeAndGetPixels(currentPattern.originalImage);
                 const colorCount = parseInt(document.getElementById('colorCount').value);
                 const { colors, mappedPixels } = reduceColors(pixelData, colorCount);
