@@ -374,7 +374,7 @@
 </head>
 <body>
     <h1>Strijkkralen Patroon Maker</h1>
-    <p class="subtitle">Maak van elke afbeelding een mooi strijkkralen patroon! <small style="opacity:0.5">(v3 - Pixel Art)</small></p>
+    <p class="subtitle">Maak van elke afbeelding een mooi strijkkralen patroon! <small style="opacity:0.5">(v4)</small></p>
 
     <div class="container">
         <div class="upload-section" id="uploadSection">
@@ -408,8 +408,12 @@
                 </select>
             </div>
             <div class="setting-group">
+                <label for="focusSubject">Focus op onderwerp:</label>
+                <input type="checkbox" id="focusSubject" checked>
+            </div>
+            <div class="setting-group">
                 <label for="pixelArtMode">Pixel Art modus:</label>
-                <input type="checkbox" id="pixelArtMode" checked>
+                <input type="checkbox" id="pixelArtMode">
             </div>
             <div class="setting-group">
                 <label for="showSymbols">Toon symbolen:</label>
@@ -458,7 +462,9 @@
                     <li>Begin linksboven en werk rij voor rij naar beneden</li>
                     <li>Vraag een volwassene om te helpen met strijken!</li>
                 </ul>
-                <p style="margin-top:15px;font-size:0.9em;"><strong>Tip:</strong> Gebruik "Pixel Art modus" voor afbeeldingen met scherpe randen (zoals game sprites). Zet het uit voor foto's.</p>
+                <p style="margin-top:15px;font-size:0.9em;"><strong>Tips:</strong><br>
+                - "Focus op onderwerp" negeert de achtergrond en focust op het centrale onderwerp (ideaal voor foto's)<br>
+                - "Pixel Art modus" behoudt scherpe randen (voor game sprites, logo's)</p>
             </div>
         </div>
     </div>
@@ -547,6 +553,12 @@
         document.getElementById('gridSize').addEventListener('change', () => {
             if (currentPattern) {
                 GRID_SIZE = parseInt(document.getElementById('gridSize').value);
+                regeneratePattern();
+            }
+        });
+
+        document.getElementById('focusSubject').addEventListener('change', () => {
+            if (currentPattern) {
                 regeneratePattern();
             }
         });
@@ -765,8 +777,50 @@
             }).join('').toUpperCase();
         }
 
+        // Detecteer achtergrondkleur door te kijken naar de randen van de afbeelding
+        function detectBackgroundColor(pixels) {
+            const colorCounts = new Map();
+            const edgeSize = Math.max(2, Math.floor(GRID_SIZE * 0.15)); // 15% van de rand
+
+            // Tel kleuren aan alle vier de randen
+            for (let y = 0; y < GRID_SIZE; y++) {
+                for (let x = 0; x < GRID_SIZE; x++) {
+                    const isEdge = x < edgeSize || x >= GRID_SIZE - edgeSize ||
+                                   y < edgeSize || y >= GRID_SIZE - edgeSize;
+                    if (isEdge) {
+                        const pixel = pixels[y][x];
+                        // Quantiseer voor groepering
+                        const qr = Math.round(pixel.r / 16) * 16;
+                        const qg = Math.round(pixel.g / 16) * 16;
+                        const qb = Math.round(pixel.b / 16) * 16;
+                        const key = `${qr},${qg},${qb}`;
+                        colorCounts.set(key, (colorCounts.get(key) || 0) + 1);
+                    }
+                }
+            }
+
+            // Vind de meest voorkomende kleur aan de randen
+            let maxCount = 0;
+            let bgColor = null;
+            for (const [key, count] of colorCounts) {
+                if (count > maxCount) {
+                    maxCount = count;
+                    const [r, g, b] = key.split(',').map(Number);
+                    bgColor = { r, g, b };
+                }
+            }
+
+            // Als de achtergrond minstens 40% van de rand beslaat, beschouw het als achtergrond
+            const edgePixelCount = GRID_SIZE * edgeSize * 4 - 4 * edgeSize * edgeSize;
+            if (maxCount > edgePixelCount * 0.4) {
+                return bgColor;
+            }
+            return null;
+        }
+
         function reduceColors(pixels, maxColors) {
             const pixelArtMode = document.getElementById('pixelArtMode').checked;
+            const focusSubject = document.getElementById('focusSubject').checked;
 
             // Converteer palet naar RGB met LAB cache
             const paletteRgb = COLOR_PALETTE.map(c => {
@@ -779,10 +833,21 @@
                 };
             });
 
+            // Detecteer achtergrondkleur als focus op onderwerp aan staat
+            let bgColor = null;
+            if (focusSubject) {
+                bgColor = detectBackgroundColor(pixels);
+            }
+
             // STAP 1: Match elke pixel direct met dichtstbijzijnde palet kleur
             const paletteUsage = new Map();
             const pixelPaletteMap = [];
-            const pixelImportance = new Map(); // Track kleurbelang (rand-pixels tellen zwaarder)
+            const pixelImportance = new Map();
+
+            // Bereken centrum van de afbeelding
+            const centerX = GRID_SIZE / 2;
+            const centerY = GRID_SIZE / 2;
+            const maxDist = Math.sqrt(centerX * centerX + centerY * centerY);
 
             for (let y = 0; y < GRID_SIZE; y++) {
                 const row = [];
@@ -802,10 +867,27 @@
                     row.push(bestPaletteIndex);
                     const hex = paletteRgb[bestPaletteIndex].hex;
 
-                    // Bereken importance: rand-pixels zijn belangrijker
+                    // Bereken importance
                     let importance = 1;
+
+                    // Focus op onderwerp: centrum telt zwaarder, achtergrond telt minder
+                    if (focusSubject) {
+                        // Afstand tot centrum (0 = centrum, 1 = hoek)
+                        const distToCenter = Math.sqrt(
+                            Math.pow(x - centerX, 2) + Math.pow(y - centerY, 2)
+                        ) / maxDist;
+
+                        // Centrum pixels krijgen tot 4x meer gewicht
+                        importance = 1 + 3 * (1 - distToCenter);
+
+                        // Als dit pixel lijkt op de achtergrond, verminder het gewicht sterk
+                        if (bgColor && colorDistanceFast(pixel, bgColor) < 40) {
+                            importance *= 0.1; // Achtergrond telt bijna niet mee
+                        }
+                    }
+
+                    // Pixel Art modus: rand-pixels zijn belangrijker
                     if (pixelArtMode && x > 0 && y > 0 && x < GRID_SIZE - 1 && y < GRID_SIZE - 1) {
-                        // Check of dit een rand-pixel is (heeft buren met andere kleur)
                         const neighbors = [
                             pixels[y-1]?.[x], pixels[y+1]?.[x],
                             pixels[y][x-1], pixels[y][x+1]
@@ -813,7 +895,7 @@
 
                         for (const neighbor of neighbors) {
                             if (colorDistanceFast(pixel, neighbor) > 30) {
-                                importance = 3; // Rand-pixels tellen 3x zo zwaar
+                                importance *= 2;
                                 break;
                             }
                         }
@@ -835,29 +917,44 @@
 
             const selectedColors = [];
 
+            // Als focus op onderwerp aan staat, filter eerst achtergrondachtige kleuren
+            if (focusSubject && bgColor) {
+                // Verwijder kleuren die te veel op de achtergrond lijken uit de top posities
+                const bgPaletteColor = paletteRgb.reduce((best, c) => {
+                    const dist = colorDistanceFast(c, bgColor);
+                    return dist < colorDistanceFast(best, bgColor) ? c : best;
+                });
+
+                // Markeer achtergrondkleur
+                for (const item of allColors) {
+                    if (item.color.hex === bgPaletteColor.hex) {
+                        item.isBackground = true;
+                        break;
+                    }
+                }
+            }
+
             // Prioriteit voor zwart en wit als ze veel voorkomen (essentieel voor pixel art)
-            const blackIdx = allColors.findIndex(c => c.color.hex === '#000000');
-            const whiteIdx = allColors.findIndex(c => c.color.hex === '#FFFFFF');
+            const blackIdx = allColors.findIndex(c => c.color.hex === '#000000' && !c.isBackground);
+            const whiteIdx = allColors.findIndex(c => c.color.hex === '#FFFFFF' && !c.isBackground);
 
             if (pixelArtMode) {
-                // Voeg zwart toe als het significant voorkomt
                 if (blackIdx !== -1 && allColors[blackIdx].count > GRID_SIZE * 2) {
                     selectedColors.push(allColors[blackIdx].color);
                     allColors.splice(blackIdx, 1);
                 }
-                // Voeg wit toe als het significant voorkomt
-                const newWhiteIdx = allColors.findIndex(c => c.color.hex === '#FFFFFF');
+                const newWhiteIdx = allColors.findIndex(c => c.color.hex === '#FFFFFF' && !c.isBackground);
                 if (newWhiteIdx !== -1 && allColors[newWhiteIdx].count > GRID_SIZE * 2) {
                     selectedColors.push(allColors[newWhiteIdx].color);
                     allColors.splice(newWhiteIdx, 1);
                 }
             }
 
-            // Voeg overige kleuren toe met diversiteitscheck
+            // Voeg eerst niet-achtergrond kleuren toe
             for (const item of allColors) {
                 if (selectedColors.length >= maxColors) break;
+                if (item.isBackground) continue; // Skip achtergrondkleur eerst
 
-                // Check of deze kleur voldoende verschilt van al geselecteerde kleuren
                 let tooSimilar = false;
                 for (const selected of selectedColors) {
                     if (colorDistance(item.color, selected) < 25) {
@@ -871,7 +968,7 @@
                 }
             }
 
-            // Als we nog niet genoeg kleuren hebben, voeg de meest voorkomende toe
+            // Als we nog niet genoeg kleuren hebben, voeg dan ook achtergrondkleur toe
             for (const item of allColors) {
                 if (selectedColors.length >= maxColors) break;
                 if (!selectedColors.includes(item.color)) {
